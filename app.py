@@ -69,7 +69,7 @@ if model_error:
     st.error(f"⚠️ {model_error}")
     st.stop()
 
-# Full list of features used in training (exact order from your df_encoded)
+# Exact feature columns used during training (from your df_encoded header)
 feature_cols = [
     'Chemotherapy', 'ER status measured by IHC', 'ER Status', 'HER2 status measured by SNP6', 'HER2 Status',
     'Hormone Therapy', 'Inferred Menopausal State', 'Radio Therapy', 'PR Status', 'Tumor Stage_1.0',
@@ -95,10 +95,11 @@ feature_cols = [
 ]
 
 def prepare_data_for_model(user_input_dict, model_features):
-    # Create a DataFrame with ALL model columns, filled with 0
+    """Create DataFrame with exact column names & order the model expects"""
+    # Start with all-zero row matching model's feature count and names
     df = pd.DataFrame(0, index=[0], columns=model_features)
 
-    # Map and fill user-provided values
+    # Fill user-provided values (mapping to exact model column names)
     rename_map = {
         'Age at Diagnosis': 'Age at Diagnosis',
         'Lymph nodes examined positive': 'Lymph nodes examined positive',
@@ -117,30 +118,6 @@ def prepare_data_for_model(user_input_dict, model_features):
 
     return df
 
-# ... inside your if predict_button block ...
-if predict_button:
-    input_data = {
-        'Age at Diagnosis': age,
-        'Lymph nodes examined positive': lymph_nodes,
-        'Mutation Count': mutation_count,
-        'Nottingham prognostic index': npi,
-        'Tumor Size': tumor_size,
-        'Chemotherapy': chemo,
-        'ER Status': er_status,
-        'PR Status': pr_status
-    }
-
-    input_df_prepared = prepare_data_for_model(input_data, feature_cols)
-
-    with st.spinner("🤖 Analyzing patient data..."):
-        try:
-            prediction = model.predict(input_df_prepared)[0]
-            probability = model.predict_proba(input_df_prepared)[0]
-            # rest of your code...
-        except Exception as e:
-            st.error(f"Prediction failed: {str(e)}")
-            st.info("This usually means column names or order don't match training data exactly.")
-
 # Header
 st.markdown("""
 <div class="main-header">
@@ -149,7 +126,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Tabs
+# Tabs for Home & Analyze
 tab1, tab2 = st.tabs(["🏠 Home", "📊 Analyze Risk"])
 
 with tab1:
