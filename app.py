@@ -69,7 +69,7 @@ if model_error:
     st.error(f"⚠️ {model_error}")
     st.stop()
 
-# EXACT feature columns the model was trained on (from your df_encoded.csv header, minus leakage)
+# Exact feature columns (from your df_encoded.csv header, minus leakage columns)
 feature_cols = [
     'Chemotherapy', 'ER status measured by IHC', 'ER Status', 'HER2 status measured by SNP6', 'HER2 Status',
     'Hormone Therapy', 'Inferred Menopausal State', 'Radio Therapy', 'PR Status', 'Tumor Stage_1.0',
@@ -96,7 +96,7 @@ feature_cols = [
 
 def prepare_data_for_model(user_input_dict, model_features):
     """Create DataFrame with EXACT column names and order the model expects"""
-    df = pd.DataFrame(0, index=[0], columns=model_features)
+    df = pd.DataFrame(0, index=[0], columns=model_features, dtype=float)
     
     rename_map = {
         'Age at Diagnosis': 'Age at Diagnosis',
@@ -112,8 +112,8 @@ def prepare_data_for_model(user_input_dict, model_features):
     for key, value in user_input_dict.items():
         model_col = rename_map.get(key, key)
         if model_col in df.columns:
-            df.at[0, model_col] = value
-            
+            df.at[0, model_col] = float(value)  # force float to avoid dtype warning
+    
     return df
 
 # Header
@@ -124,7 +124,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Tabs
+# Tabs for Home & Analyze
 tab1, tab2 = st.tabs(["🏠 Home", "📊 Analyze Risk"])
 
 with tab1:
@@ -248,7 +248,11 @@ with tab2:
                     {'range': [50, 75], 'color': "orange"},
                     {'range': [75, 100], 'color': "red"}
                 ],
-                'threshold': {'line': {'color': "red", 'width': 4}, 'thickness': 0.75, 'value': 90}
+                'threshold': {
+                    'line': {'color': "red", 'width': 4},
+                    'thickness': 0.75,
+                    'value': 90
+                }
             }
         ))
         fig_gauge.update_layout(height=400)
