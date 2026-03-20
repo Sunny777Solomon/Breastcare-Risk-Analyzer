@@ -3,7 +3,7 @@ import joblib
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from pathlib import Path
+import time
 
 st.set_page_config(
     page_title="Breasts they could use your support",
@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS – pink theme, elegant fonts, subtle background
+# ──── Custom CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Inter:wght@300;400;500;600&display=swap');
@@ -44,7 +44,7 @@ st.markdown("""
         padding-bottom: 0.6rem;
         margin-bottom: 1.5rem;
     }
-    .btn-primary {
+    .stButton > button {
         background: linear-gradient(135deg, #ec4899, #db2777) !important;
         color: white !important;
         border-radius: 999px !important;
@@ -52,38 +52,30 @@ st.markdown("""
         font-size: 1.3rem !important;
         transition: all 0.3s;
     }
-    .btn-primary:hover {
+    .stButton > button:hover {
         transform: translateY(-3px);
         box-shadow: 0 10px 25px rgba(236, 72, 153, 0.4) !important;
     }
-    .result-high {
-        color: #dc2626;
-        font-size: 3.5rem;
-        font-weight: bold;
-    }
-    .result-low {
-        color: #059669;
-        font-size: 3.5rem;
-        font-weight: bold;
-    }
+    .result-high { color: #dc2626; font-size: 3.5rem; font-weight: bold; }
+    .result-low  { color: #059669; font-size: 3.5rem; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
-# Load model
+# ──── Load model ────────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
     try:
         model = joblib.load("rf.pkl")
         return model
     except Exception as e:
-        st.error(f"Model loading failed: {e}")
+        st.error(f"Model loading failed: {str(e)}")
         st.stop()
 
 model = load_model()
 
-# Features (same as your FastAPI version)
+# ──── Features definition ───────────────────────────────────────────────────────
 FEATURES = [
-    {"key": "Age_at_Diagnosis", "label": "Age at Diagnosis (years)", "min": 20, "max": 100, "step": 0.1, "type": "number"},
+    {"key": "Age_at_Diagnosis", "label": "Age at Diagnosis (years)", "min": 20, "max": 100, "step": 1, "type": "number"},
     {"key": "Tumor_Size", "label": "Tumor Size (mm)", "min": 0, "max": 150, "step": 0.1, "type": "number"},
     {"key": "Lymph_nodes_examined_positive", "label": "Positive Lymph Nodes", "min": 0, "max": 50, "step": 1, "type": "number"},
     {"key": "Mutation_Count", "label": "Mutation Count", "min": 0, "max": 200, "step": 1, "type": "number"},
@@ -93,7 +85,7 @@ FEATURES = [
     {"key": "PR_Status", "label": "PR Status", "type": "select", "options": {0: "🔴 Negative", 1: "🟢 Positive"}},
 ]
 
-# Column mapping for model
+# Column name mapping for the model
 COLUMN_MAP = {
     "Age_at_Diagnosis": "Age at Diagnosis",
     "Tumor_Size": "Tumor Size",
@@ -105,19 +97,18 @@ COLUMN_MAP = {
     "PR_Status": "PR Status",
 }
 
-# Full model features (you can expand if needed)
-MODEL_FEATURES = list(COLUMN_MAP.values()) + [...]  # add all other features as 0 if needed
+# You can expand this list with all expected model columns (others will be filled with 0)
+MODEL_FEATURES = list(COLUMN_MAP.values())  # + add more if needed
 
 def prepare_input(user_data):
     df = pd.DataFrame([user_data])
     df = df.rename(columns=COLUMN_MAP)
     for col in MODEL_FEATURES:
         if col not in df.columns:
-            df[col] = 0
+            df[col] = 0.0
     return df[MODEL_FEATURES]
 
-# ──────────────────────────────────────── UI ────────────────────────────────────────
-
+# ──── UI ────────────────────────────────────────────────────────────────────────
 st.markdown(
     """
     <div style="text-align:center; padding: 3rem 0 1.5rem;">
@@ -147,17 +138,14 @@ with tab1:
     - **Age**: The age-adjusted incidence of breast cancer continues to increase with the advancing age of the female population.
     - **Gender**: Most breast cancers occur in women.
     - **Personal history**: A history of cancer in one breast increases the likelihood of a second primary cancer in the contralateral breast.
-    - **Histologic**: Histologic abnormalities diagnosed by breast biopsy... (LCIS, proliferative changes with atypia).
-    - **Family history and genetic mutations**: First-degree relatives... BRCA1 and BRCA2...
-    - **Reproductive**: Early menarche, late first childbirth, nulliparity, late menopause.
-    - **Exogenous hormone use**: Oral contraceptives, hormone replacement therapy.
-    - **Other**: Radiation, obesity, alcohol, environmental exposures.
+    - **Histologic**: Histologic abnormalities diagnosed by breast biopsy constitute an essential category of breast cancer risk factors. These abnormalities include lobular carcinoma in situ (LCIS) and proliferative changes with atypia.
+    - **Family history and genetic mutations**: First-degree relatives of patients with breast cancer have a 2-fold to 3-fold excess risk for the development of the disease. Genetic factors cause 5% to 10% of all breast cancer cases but may account for 25% of cases in women younger than 30 years. BRCA1 and BRCA2 are the most important genes responsible for increased breast cancer susceptibility.
+    - **Reproductive**: Reproductive milestones that increase a woman’s lifetime estrogen exposure are thought to increase breast cancer risk. These include the onset of menarche before age 12, first live childbirth after age 30 years, nulliparity, and menopause after the age of 55.
+    - **Exogenous hormone use**: Therapeutic or supplemental estrogen and progesterone are taken for various conditions, with the most common scenarios being contraception in premenopausal women and hormone replacement therapy in postmenopausal women.
+    - **Other**: Radiation, environmental exposures, obesity, and excessive alcohol consumption are some other factors that are associated with an increased risk of breast cancer.
     """)
 
     st.markdown("</div>", unsafe_allow_html=True)
-
-    if st.button("Start Your Risk Analysis →", type="primary", use_container_width=False):
-        st.switch_page("pages/analyze.py")  # if using multi-page, or just scroll / use session state
 
 with tab2:
     st.markdown("<div class='main-block'>", unsafe_allow_html=True)
@@ -177,12 +165,20 @@ with tab2:
                         key=f["key"]
                     )
                 else:
+                    # ──── FIX: Force consistent numeric types ───────────────────────
+                    step_is_float = isinstance(f["step"], float) or f["step"] != int(f["step"])
+
+                    min_val = float(f["min"]) if step_is_float else int(f["min"])
+                    max_val = float(f["max"]) if step_is_float else int(f["max"])
+                    default_val = float((f["min"] + f["max"]) / 2) if step_is_float else int((f["min"] + f["max"]) / 2)
+                    step_val = f["step"] if step_is_float else int(f["step"])
+
                     user_input[f["key"]] = st.number_input(
                         f["label"],
-                        min_value=f["min"],
-                        max_value=f["max"],
-                        step=f["step"],
-                        value=float((f["min"] + f["max"]) / 2),
+                        min_value=min_val,
+                        max_value=max_val,
+                        value=default_val,
+                        step=step_val,
                         key=f["key"]
                     )
 
@@ -190,8 +186,6 @@ with tab2:
 
     if analyze_btn:
         with st.spinner("Analyzing your information..."):
-            # fake delay for animation feel
-            import time
             progress_bar = st.progress(0)
             for pct in range(0, 101, 5):
                 time.sleep(0.08)
@@ -218,7 +212,7 @@ with tab2:
             This is a very encouraging result. Continue regular screenings and healthy habits.
             """)
 
-        # Gauge
+        # Risk gauge
         fig = go.Figure(go.Indicator(
             mode="gauge+number+delta",
             value=probability,
@@ -242,6 +236,7 @@ with tab2:
 
     st.markdown("</div>", unsafe_allow_html=True)
 
+# Footer
 st.markdown("""
 <div style="text-align:center; padding:3rem 1rem; color:#6b7280; font-size:0.95rem;">
     🎗️ Educational awareness tool only — not medical advice. Always consult a healthcare professional.
