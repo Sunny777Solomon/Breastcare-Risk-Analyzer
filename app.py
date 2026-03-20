@@ -69,7 +69,7 @@ if model_error:
     st.error(f"⚠️ {model_error}")
     st.stop()
 
-# Define all features used in training (exact order from your original df_encoded)
+# Full list of features used in training (exact order from your df_encoded)
 feature_cols = [
     'Chemotherapy', 'ER status measured by IHC', 'ER Status', 'HER2 status measured by SNP6', 'HER2 Status',
     'Hormone Therapy', 'Inferred Menopausal State', 'Radio Therapy', 'PR Status', 'Tumor Stage_1.0',
@@ -94,13 +94,29 @@ feature_cols = [
     'Mutation Count', 'Nottingham prognostic index', 'Tumor Size'
 ]
 
-def prepare_data_for_model(df, model_features):
-    df_model = df.copy()
-    for col in model_features:
-        if col not in df_model.columns:
-            df_model[col] = 0
-    df_model = df_model[model_features]
-    return df_model
+def prepare_data_for_model(user_input_dict, model_features):
+    """Create DataFrame with exact column names & order the model expects"""
+    # Start with all-zero row matching model's feature count and names
+    df = pd.DataFrame(0, index=[0], columns=model_features)
+
+    # Fill in the user-provided values
+    rename_map = {
+        'Age at Diagnosis': 'Age at Diagnosis',
+        'Lymph nodes examined positive': 'Lymph nodes examined positive',
+        'Mutation Count': 'Mutation Count',
+        'Nottingham prognostic index': 'Nottingham prognostic index',
+        'Tumor Size': 'Tumor Size',
+        'Chemotherapy': 'Chemotherapy',
+        'ER Status': 'ER Status',
+        'PR Status': 'PR Status'
+    }
+
+    for key, value in user_input_dict.items():
+        model_col = rename_map.get(key, key)
+        if model_col in df.columns:
+            df.at[0, model_col] = value
+
+    return df
 
 # Header
 st.markdown("""
@@ -110,20 +126,20 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Tabs for Home & Analyze
+# Tabs
 tab1, tab2 = st.tabs(["🏠 Home", "📊 Analyze Risk"])
 
 with tab1:
-    st.markdown("### Understanding Breast Cancer")
     st.markdown("""
     <div class="info-card content-text">
+        <h3>Understanding Breast Cancer</h3>
         Breast cancer is the most common cancer diagnosed in women and the second most common cause of death from cancer among women worldwide. The breasts are paired glands of variable size and density that lie superficial to the pectoralis major muscle. They contain milk-producing cells arranged in lobules; multiple lobules are aggregated into lobes with interspersed fat. Milk and other secretions are produced in acini and extruded through lactiferous ducts that exit at the nipple. Breasts are anchored to the underlying muscular fascia by Cooper ligaments, which support the breast. Breast cancer most commonly arises in the ductal epithelium (ie, ductal carcinoma) but can also develop in the breast lobules (ie, lobular carcinoma). Several risk factors for breast cancer have been well described. In Western countries, screening programs have succeeded in identifying most breast cancers through screening rather than due to symptoms. However, in much of the developing world, a breast mass or abnormal nipple discharge is often the presenting symptom. Breast cancer is diagnosed through physical examination, breast imaging, and tissue biopsy. Treatment options include surgery, chemotherapy, radiation, hormonal therapy, and, more recently, immunotherapy. Factors such as histology, stage, tumor markers, and genetic abnormalities guide individualized treatment decisions.
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("### Breast Cancer Risk Factors")
     st.markdown("""
     <div class="info-card content-text">
+        <h3>Breast Cancer Risk Factors</h3>
         Identifying factors associated with an increased incidence of breast cancer development is important in general health screening for women. Risk factors for breast cancer include:<br><br>
         <strong>Age:</strong> The age-adjusted incidence of breast cancer continues to increase with the advancing age of the female population.<br><br>
         <strong>Gender:</strong> Most breast cancers occur in women.<br><br>
@@ -203,8 +219,7 @@ with tab2:
             'PR Status': pr_status
         }
 
-        input_df = pd.DataFrame([input_data])
-        input_df_prepared = prepare_data_for_model(input_df, feature_cols)
+        input_df_prepared = prepare_data_for_model(input_data, feature_cols)
 
         with st.spinner("🤖 Analyzing patient data..."):
             try:
