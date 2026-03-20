@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import time
+from pathlib import Path
 
 st.set_page_config(
     page_title="Breasts they could use your support",
@@ -12,15 +13,18 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ──── Custom CSS ────────────────────────────────────────────────────────────────
+# ──── Custom CSS with background image ──────────────────────────────────────────
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Inter:wght@300;400;500;600&display=swap');
 
     body {
         font-family: 'Inter', sans-serif;
-        background: linear-gradient(135deg, #fdf2f8, #fae8f0);
+        background-image: url('bg.png');  /* ← your uploaded image */
         background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        background-color: #fdf2f8;
         color: #4a4a4a;
     }
     h1, h2, h3 {
@@ -28,15 +32,15 @@ st.markdown("""
         color: #db2777;
     }
     .stApp > header {
-        background: rgba(253, 242, 248, 0.9);
-        backdrop-filter: blur(10px);
+        background: rgba(253, 242, 248, 0.92);
+        backdrop-filter: blur(12px);
     }
     .main-block {
-        background: rgba(255, 255, 255, 0.92);
+        background: rgba(255, 255, 255, 0.94);
         border-radius: 1.5rem;
-        padding: 2.5rem;
+        padding: 2rem 2.5rem;
         box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-        margin: 1rem auto;
+        margin: 1.5rem auto;
         max-width: 1100px;
     }
     .section-title {
@@ -58,23 +62,26 @@ st.markdown("""
     }
     .result-high { color: #dc2626; font-size: 3.5rem; font-weight: bold; }
     .result-low  { color: #059669; font-size: 3.5rem; font-weight: bold; }
+    .empty-space-fix { margin-bottom: 0 !important; padding-bottom: 0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
 # ──── Load model ────────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
+    model_path = Path("rf.pkl")
+    if not model_path.exists():
+        st.error("rf.pkl not found in the app directory. Please upload it to the GitHub repo root.")
+        st.stop()
     try:
-        model = joblib.load("rf.pkl")
-        return model
+        return joblib.load(model_path)
     except Exception as e:
         st.error(f"Model loading failed: {str(e)}")
         st.stop()
 
 model = load_model()
 
-# ──── Full list of features the model was trained on ────────────────────────────
-# This MUST match the exact column names and order from training (from df_encoded.csv)
+# ──── Full feature list (must match training exactly) ───────────────────────────
 MODEL_FEATURES = [
     'Chemotherapy', 'ER status measured by IHC', 'ER Status', 'HER2 status measured by SNP6', 'HER2 Status',
     'Hormone Therapy', 'Inferred Menopausal State', 'Radio Therapy', 'PR Status', 'Tumor Stage_1.0',
@@ -99,7 +106,7 @@ MODEL_FEATURES = [
     'Mutation Count', 'Nottingham prognostic index', 'Tumor Size'
 ]
 
-# ──── Features for user input ───────────────────────────────────────────────────
+# ──── User input fields ─────────────────────────────────────────────────────────
 FEATURES = [
     {"key": "Age_at_Diagnosis", "label": "Age at Diagnosis (years)", "min": 20, "max": 100, "step": 1, "type": "number"},
     {"key": "Tumor_Size", "label": "Tumor Size (mm)", "min": 0, "max": 150, "step": 0.1, "type": "number"},
@@ -111,7 +118,6 @@ FEATURES = [
     {"key": "PR_Status", "label": "PR Status", "type": "select", "options": {0: "🔴 Negative", 1: "🟢 Positive"}},
 ]
 
-# ──── Column mapping ────────────────────────────────────────────────────────────
 COLUMN_MAP = {
     "Age_at_Diagnosis": "Age at Diagnosis",
     "Tumor_Size": "Tumor Size",
@@ -124,20 +130,12 @@ COLUMN_MAP = {
 }
 
 def prepare_input(user_data):
-    # Create DataFrame from the 8 user inputs
     df = pd.DataFrame([user_data])
-    
-    # Rename to match model's expected column names
     df = df.rename(columns=COLUMN_MAP)
-    
-    # Fill ALL missing columns with 0 (this is the key fix!)
     for col in MODEL_FEATURES:
         if col not in df.columns:
             df[col] = 0.0
-    
-    # Reorder columns exactly as the model expects
-    df = df[MODEL_FEATURES]
-    
+    df = df[MODEL_FEATURES]  # enforce exact order
     return df
 
 # ──── UI ────────────────────────────────────────────────────────────────────────
@@ -155,12 +153,27 @@ tab1, tab2 = st.tabs(["🏠 Home", "📊 Analyze Risk"])
 
 with tab1:
     st.markdown("<div class='main-block'>", unsafe_allow_html=True)
+
     st.markdown("<h2 class='section-title'>Understanding Breast Cancer</h2>", unsafe_allow_html=True)
     st.markdown("""
-    Breast cancer is the most common cancer diagnosed in women and the second most common cause of death from cancer among women worldwide. ...
-    """)  # ← paste your full text here if truncated
-    st.markdown("<h3 class='section-title'>Breast Cancer Risk Factors</h3>", unsafe_allow_html=True)
-    st.markdown(""" ... """)  # ← your full risk factors text
+    Breast cancer is the most common cancer diagnosed in women and the second most common cause of death from cancer among women worldwide. The breasts are paired glands of variable size and density that lie superficial to the pectoralis major muscle. They contain milk-producing cells arranged in lobules; multiple lobules are aggregated into lobes with interspersed fat. Milk and other secretions are produced in acini and extruded through lactiferous ducts that exit at the nipple. Breasts are anchored to the underlying muscular fascia by Cooper ligaments, which support the breast. Breast cancer most commonly arises in the ductal epithelium (ie, ductal carcinoma) but can also develop in the breast lobules (ie, lobular carcinoma). Several risk factors for breast cancer have been well described. In Western countries, screening programs have succeeded in identifying most breast cancers through screening rather than due to symptoms. However, in much of the developing world, a breast mass or abnormal nipple discharge is often the presenting symptom. Breast cancer is diagnosed through physical examination, breast imaging, and tissue biopsy. Treatment options include surgery, chemotherapy, radiation, hormonal therapy, and, more recently, immunotherapy. Factors such as histology, stage, tumor markers, and genetic abnormalities guide individualized treatment decisions.
+    """)
+
+    st.markdown("<h3 class='section-title' style='margin-top:2rem;'>Breast Cancer Risk Factors</h3>", unsafe_allow_html=True)
+
+    st.markdown("""
+    Identifying factors associated with an increased incidence of breast cancer development is important in general health screening for women. Risk factors for breast cancer include:
+
+    - **Age**: The age-adjusted incidence of breast cancer continues to increase with the advancing age of the female population.
+    - **Gender**: Most breast cancers occur in women.
+    - **Personal history**: A history of cancer in one breast increases the likelihood of a second primary cancer in the contralateral breast.
+    - **Histologic**: Histologic abnormalities diagnosed by breast biopsy constitute an essential category of breast cancer risk factors. These abnormalities include lobular carcinoma in situ (LCIS) and proliferative changes with atypia.
+    - **Family history and genetic mutations**: First-degree relatives of patients with breast cancer have a 2-fold to 3-fold excess risk for the development of the disease. Genetic factors cause 5% to 10% of all breast cancer cases but may account for 25% of cases in women younger than 30 years. BRCA1 and BRCA2 are the most important genes responsible for increased breast cancer susceptibility.
+    - **Reproductive**: Reproductive milestones that increase a woman’s lifetime estrogen exposure are thought to increase breast cancer risk. These include the onset of menarche before age 12, first live childbirth after age 30 years, nulliparity, and menopause after the age of 55.
+    - **Exogenous hormone use**: Therapeutic or supplemental estrogen and progesterone are taken for various conditions, with the most common scenarios being contraception in premenopausal women and hormone replacement therapy in postmenopausal women.
+    - **Other**: Radiation, environmental exposures, obesity, and excessive alcohol consumption are some other factors that are associated with an increased risk of breast cancer.
+    """)
+
     st.markdown("</div>", unsafe_allow_html=True)
 
 with tab2:
@@ -181,9 +194,7 @@ with tab2:
                         key=f["key"]
                     )
                 else:
-                    # Force consistent numeric types
                     step_is_float = isinstance(f["step"], float) or f["step"] != int(f["step"])
-
                     min_val = float(f["min"]) if step_is_float else int(f["min"])
                     max_val = float(f["max"]) if step_is_float else int(f["max"])
                     default_val = float((f["min"] + f["max"]) / 2) if step_is_float else int((f["min"] + f["max"]) / 2)
@@ -217,10 +228,17 @@ with tab2:
 
                 if prediction == 1:
                     st.markdown(f"<p class='result-high'>HIGH 10-Year Mortality Risk</p><p style='font-size:4rem;'>{prob_str}</p>", unsafe_allow_html=True)
-                    st.error("Please consult a doctor immediately. ...")
+                    st.error("""
+                    **Please consult a doctor immediately.**  
+                    A high predicted risk means early intervention can still make a significant difference.  
+                    Schedule an appointment with an oncologist as soon as possible.
+                    """)
                 else:
                     st.markdown(f"<p class='result-low'>LOW 10-Year Mortality Risk</p><p style='font-size:4rem;'>{prob_str}</p>", unsafe_allow_html=True)
-                    st.success("Keep it up — you're doing wonderfully. ...")
+                    st.success("""
+                    **Keep it up — you're doing wonderfully.**  
+                    This is a very encouraging result. Continue regular screenings and healthy habits.
+                    """)
 
                 # Gauge
                 fig = go.Figure(go.Indicator(
@@ -246,13 +264,13 @@ with tab2:
 
             except Exception as e:
                 st.error(f"Prediction failed: {str(e)}")
-                st.info("Check that rf.pkl is uploaded and matches the expected features.")
+                st.info("Possible causes:\n- rf.pkl not found or corrupted\n- Feature mismatch between model and input\n- Missing columns in input data")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # Footer
 st.markdown("""
-<div style="text-align:center; padding:3rem 1rem; color:#6b7280; font-size:0.95rem;">
+<div style="text-align:center; padding:2rem 1rem; color:#6b7280; font-size:0.95rem;">
     🎗️ Educational awareness tool only — not medical advice. Always consult a healthcare professional.
 </div>
 """, unsafe_allow_html=True)
