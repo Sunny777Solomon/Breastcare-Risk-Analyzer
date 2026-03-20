@@ -69,7 +69,7 @@ if model_error:
     st.error(f"⚠️ {model_error}")
     st.stop()
 
-# Define all features used in training (exact order from your df_encoded.csv)
+# Full list of features used in training (from your df_encoded.csv header, minus leakage)
 feature_cols = [
     'Chemotherapy', 'ER status measured by IHC', 'ER Status', 'HER2 status measured by SNP6', 'HER2 Status',
     'Hormone Therapy', 'Inferred Menopausal State', 'Radio Therapy', 'PR Status', 'Tumor Stage_1.0',
@@ -96,10 +96,8 @@ feature_cols = [
 
 def prepare_data_for_model(user_input_dict, model_features):
     """Create DataFrame with exact column names & order the model expects"""
-    # Start with all-zero row with exact column names and order
     df = pd.DataFrame(0, index=[0], columns=model_features, dtype=float)
     
-    # Fill user-provided values
     rename_map = {
         'Age at Diagnosis': 'Age at Diagnosis',
         'Lymph nodes examined positive': 'Lymph nodes examined positive',
@@ -114,7 +112,7 @@ def prepare_data_for_model(user_input_dict, model_features):
     for key, value in user_input_dict.items():
         model_col = rename_map.get(key, key)
         if model_col in df.columns:
-            df.at[0, model_col] = float(value)  # force float to avoid dtype warnings
+            df.at[0, model_col] = float(value)
     
     return df
 
@@ -123,6 +121,16 @@ st.markdown("""
 <div class="main-header">
     <h1>🏥 Breast Cancer Risk Prediction</h1>
     <p>Advanced Machine Learning for Breast Cancer Prognosis Assessment</p>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("### 👤 Individual Patient Risk Assessment")
+
+st.markdown("""
+<div class="info-card">
+    <h4>🔍 Patient Information</h4>
+    <p>Enter the patient's clinical and pathological information below to get a personalized 10-year mortality risk assessment.</p>
+    <p><em>Note: This form uses simplified inputs. The encoded dataset contains many more features that will be set to default values.</em></p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -153,4 +161,142 @@ with tab1:
     """, unsafe_allow_html=True)
 
 with tab2:
-    st.markdown("### 👤 Individual Patient
+    # Patient input form
+    with st.form("patient_form"):
+        st.markdown("#### 📝 Basic Demographics & Tumor Characteristics")
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            age = st.slider('👤 Age at Diagnosis', 20, 100, 50, help="Patient's age when diagnosed")
+            tumor_size = st.slider('📏 Tumor Size (mm)', 0, 100, 20, help="Maximum tumor diameter in millimeters")
+
+        with col2:
+            lymph_nodes = st.slider('🔗 Positive Lymph Nodes', 0, 50, 1, help="Number of lymph nodes with cancer cells")
+            mutation_count = st.slider('🧬 Mutation Count', 0, 500, 10, help="Total number of genetic mutations detected")
+
+        with col3:
+            npi = st.slider('📊 Nottingham Prognostic Index', 0.0, 10.0, 4.5, help="Combined prognostic score")
+
+        st.markdown("#### 🔬 Treatment & Biomarkers")
+        col4, col5, col6 = st.columns(3)
+
+        with col4:
+            chemo = st.selectbox(
+                '💊 Chemotherapy',
+                [0, 1],
+                format_func=lambda x: '✅ Yes' if x == 1 else '❌ No',
+                help="Whether patient received chemotherapy treatment"
+            )
+
+        with col5:
+            er_status = st.selectbox(
+                '🧪 ER Status',
+                [0, 1],
+                format_func=lambda x: '🟢 Positive' if x == 1 else '🔴 Negative',
+                help="Estrogen receptor status"
+            )
+
+        with col6:
+            pr_status = st.selectbox(
+                '🧪 PR Status',
+                [0, 1],
+                format_func=lambda x: '🟢 Positive' if x == 1 else '🔴 Negative',
+                help="Progesterone receptor status"
+            )
+
+        predict_button = st.form_submit_button("🔍 Analyze Patient Risk", type="primary")
+
+    if predict_button:
+        input_data = {
+            'Age at Diagnosis': age,
+            'Lymph nodes examined positive': lymph_nodes,
+            'Mutation Count': mutation_count,
+            'Nottingham prognostic index': npi,
+            'Tumor Size': tumor_size,
+            'Chemotherapy': chemo,
+            'ER Status': er_status,
+            'PR Status': pr_status
+        }
+
+        input_df_prepared = prepare_data_for_model(input_data, feature_cols)
+
+        with st.spinner("🤖 Analyzing patient data..."):
+            try:
+                prediction = model.predict(input_df_prepared)[0]
+                probability = model.predict_proba(input_df_prepared)[0]
+            except Exception as e:
+                st.error(f"❌ Prediction error: {str(e)}")
+                st.error("This is usually due to column names or order not matching exactly. Check logs for details.")
+                st.stop()
+
+        st.markdown("---")
+        st.markdown("### 📋 Risk Assessment Results")
+
+        risk_score = probability[1]
+
+        if prediction == 1:
+            st.markdown(f"""
+            <div class="prediction-positive">
+                <h3>⚠️ HIGH RISK ASSESSMENT</h3>
+                <h2>Risk Score: {risk_score:.1%}</h2>
+                <p>This patient has a <strong>high predicted risk</strong> for 10-year mortality based on the provided clinical parameters.</p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div class="prediction-negative">
+                <h3>✅ LOW RISK ASSESSMENT</h3>
+                <h2>Risk Score: {risk_score:.1%}</h2>
+                <p>This patient has a <strong>low predicted risk</strong> for 10-year mortality based on the provided clinical parameters.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number+delta",
+            value=risk_score * 100,
+            domain={'x': [0, 1], 'y': [0, 1]},
+            title={'text': "10-Year Mortality Risk (%)"},
+            delta={'reference': 50},
+            gauge={
+                'axis': {'range': [None, 100]},
+                'bar': {'color': "darkblue"},
+                'steps': [
+                    {'range': [0, 25], 'color': "lightgreen"},
+                    {'range': [25, 50], 'color': "yellow"},
+                    {'range': [50, 75], 'color': "orange"},
+                    {'range': [75, 100], 'color': "red"}
+                ],
+                'threshold': {
+                    'line': {'color': "red", 'width': 4},
+                    'thickness': 0.75,
+                    'value': 90
+                }
+            }
+        ))
+
+        fig_gauge.update_layout(height=400)
+        st.plotly_chart(fig_gauge, use_container_width=True)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("#### 📊 Patient Summary")
+            st.write(f"**Age:** {age} years")
+            st.write(f"**Tumor Size:** {tumor_size} mm")
+            st.write(f"**Positive Lymph Nodes:** {lymph_nodes}")
+            st.write(f"**Chemotherapy:** {'Yes' if chemo else 'No'}")
+        with col2:
+            st.markdown("#### 🔬 Biomarker Profile")
+            st.write(f"**ER Status:** {'Positive' if er_status else 'Negative'}")
+            st.write(f"**PR Status:** {'Positive' if pr_status else 'Negative'}")
+            st.write(f"**Mutation Count:** {mutation_count}")
+            st.write(f"**NPI Score:** {npi:.1f}")
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; padding: 2rem; background: #f8f9fa; border-radius: 10px; margin-top: 2rem;">
+    <h4>🏥 Breast Cancer Risk Prediction</h4>
+    <p>⚠️ <strong>Medical Disclaimer:</strong> This tool is for research and educational purposes only. Always consult healthcare professionals for medical decisions.</p>
+    <p><em>Powered by Machine Learning & Advanced Analytics</em></p>
+</div>
+""", unsafe_allow_html=True)
