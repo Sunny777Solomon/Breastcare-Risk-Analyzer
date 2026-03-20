@@ -69,7 +69,7 @@ if model_error:
     st.error(f"⚠️ {model_error}")
     st.stop()
 
-# Exact feature columns used during training (from your df_encoded header)
+# EXACT feature columns the model was trained on (from your df_encoded.csv header, minus leakage)
 feature_cols = [
     'Chemotherapy', 'ER status measured by IHC', 'ER Status', 'HER2 status measured by SNP6', 'HER2 Status',
     'Hormone Therapy', 'Inferred Menopausal State', 'Radio Therapy', 'PR Status', 'Tumor Stage_1.0',
@@ -95,11 +95,9 @@ feature_cols = [
 ]
 
 def prepare_data_for_model(user_input_dict, model_features):
-    """Create DataFrame with exact column names & order the model expects"""
-    # Start with all-zero row matching model's feature count and names
+    """Create DataFrame with EXACT column names and order the model expects"""
     df = pd.DataFrame(0, index=[0], columns=model_features)
-
-    # Fill user-provided values (mapping to exact model column names)
+    
     rename_map = {
         'Age at Diagnosis': 'Age at Diagnosis',
         'Lymph nodes examined positive': 'Lymph nodes examined positive',
@@ -110,12 +108,12 @@ def prepare_data_for_model(user_input_dict, model_features):
         'ER Status': 'ER Status',
         'PR Status': 'PR Status'
     }
-
+    
     for key, value in user_input_dict.items():
         model_col = rename_map.get(key, key)
         if model_col in df.columns:
             df.at[0, model_col] = value
-
+            
     return df
 
 # Header
@@ -126,7 +124,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Tabs for Home & Analyze
+# Tabs
 tab1, tab2 = st.tabs(["🏠 Home", "📊 Analyze Risk"])
 
 with tab1:
@@ -162,48 +160,32 @@ with tab2:
     </div>
     """, unsafe_allow_html=True)
 
-    # Patient input form
     with st.form("patient_form"):
         st.markdown("#### 📝 Basic Demographics & Tumor Characteristics")
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            age = st.slider('👤 Age at Diagnosis', 20, 100, 50, help="Patient's age when diagnosed")
-            tumor_size = st.slider('📏 Tumor Size (mm)', 0, 100, 20, help="Maximum tumor diameter in millimeters")
+            age = st.slider('👤 Age at Diagnosis', 20, 100, 50)
+            tumor_size = st.slider('📏 Tumor Size (mm)', 0, 100, 20)
 
         with col2:
-            lymph_nodes = st.slider('🔗 Positive Lymph Nodes', 0, 50, 1, help="Number of lymph nodes with cancer cells")
-            mutation_count = st.slider('🧬 Mutation Count', 0, 500, 10, help="Total number of genetic mutations detected")
+            lymph_nodes = st.slider('🔗 Positive Lymph Nodes', 0, 50, 1)
+            mutation_count = st.slider('🧬 Mutation Count', 0, 500, 10)
 
         with col3:
-            npi = st.slider('📊 Nottingham Prognostic Index', 0.0, 10.0, 4.5, help="Combined prognostic score")
+            npi = st.slider('📊 Nottingham Prognostic Index', 0.0, 10.0, 4.5)
 
         st.markdown("#### 🔬 Treatment & Biomarkers")
         col4, col5, col6 = st.columns(3)
 
         with col4:
-            chemo = st.selectbox(
-                '💊 Chemotherapy',
-                [0, 1],
-                format_func=lambda x: '✅ Yes' if x == 1 else '❌ No',
-                help="Whether patient received chemotherapy treatment"
-            )
+            chemo = st.selectbox('💊 Chemotherapy', [0, 1], format_func=lambda x: '✅ Yes' if x == 1 else '❌ No')
 
         with col5:
-            er_status = st.selectbox(
-                '🧪 ER Status',
-                [0, 1],
-                format_func=lambda x: '🟢 Positive' if x == 1 else '🔴 Negative',
-                help="Estrogen receptor status"
-            )
+            er_status = st.selectbox('🧪 ER Status', [0, 1], format_func=lambda x: '🟢 Positive' if x == 1 else '🔴 Negative')
 
         with col6:
-            pr_status = st.selectbox(
-                '🧪 PR Status',
-                [0, 1],
-                format_func=lambda x: '🟢 Positive' if x == 1 else '🔴 Negative',
-                help="Progesterone receptor status"
-            )
+            pr_status = st.selectbox('🧪 PR Status', [0, 1], format_func=lambda x: '🟢 Positive' if x == 1 else '🔴 Negative')
 
         predict_button = st.form_submit_button("🔍 Analyze Patient Risk", type="primary")
 
@@ -251,7 +233,6 @@ with tab2:
             </div>
             """, unsafe_allow_html=True)
 
-        # Risk visualization
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number+delta",
             value=risk_score * 100,
@@ -267,27 +248,19 @@ with tab2:
                     {'range': [50, 75], 'color': "orange"},
                     {'range': [75, 100], 'color': "red"}
                 ],
-                'threshold': {
-                    'line': {'color': "red", 'width': 4},
-                    'thickness': 0.75,
-                    'value': 90
-                }
+                'threshold': {'line': {'color': "red", 'width': 4}, 'thickness': 0.75, 'value': 90}
             }
         ))
-
         fig_gauge.update_layout(height=400)
         st.plotly_chart(fig_gauge, use_container_width=True)
 
-        # Patient summary
         col1, col2 = st.columns(2)
-
         with col1:
             st.markdown("#### 📊 Patient Summary")
             st.write(f"**Age:** {age} years")
             st.write(f"**Tumor Size:** {tumor_size} mm")
             st.write(f"**Positive Lymph Nodes:** {lymph_nodes}")
             st.write(f"**Chemotherapy:** {'Yes' if chemo else 'No'}")
-
         with col2:
             st.markdown("#### 🔬 Biomarker Profile")
             st.write(f"**ER Status:** {'Positive' if er_status else 'Negative'}")
